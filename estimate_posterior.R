@@ -14,9 +14,9 @@ updating <- function (name, priors_beta_mu1, priors_beta_sd1, priors_beta_mu0, p
   x <- data$x_norm
   y <- data$y
   
-  x_plot <- seq(5, 500, 1)
+  x_plot <- seq(5, 500, 1) # seq is similar np.arange()
   x_plot_norm <- x_plot / norm_factor
-  
+
   b1.prior_mu <- priors_beta_mu1 / norm_factor
   b1.prior_sd <- priors_beta_sd1 / norm_factor
 
@@ -26,7 +26,7 @@ updating <- function (name, priors_beta_mu1, priors_beta_sd1, priors_beta_mu0, p
   # qnorm - determines the boundary value given the area. qnorm(0.85) gives the 85th percentile of a normal distribution. This is the integral of exp((-x^2)/2) from 0 till the input argument
     exp((qnorm(x) - (-1 / priors_beta_mu0) * log(priors_beta_mu1 / norm_factor)) * priors_beta_mu0)
   }
-  # this function is used to calculate the value of the wind velocity based on equation 2 -> exp(phi_inv(y) * priors_beta_mu1) * priors_beta_mu0  = v
+  # this function is used to calculate the value of the wind velocity based on equation 5 -> exp(phi_inv(mu_y) * priors_beta_mu1) * priors_beta_mu0  = v
   # again priors_beta_mu1 is the alpha and priors_beta_mu0 is the beta of the equation corresponding to the vulnerability curve
 
   get_coeficients <- function(lower, lower_bern, upper, upper_bern) {
@@ -66,7 +66,7 @@ updating <- function (name, priors_beta_mu1, priors_beta_sd1, priors_beta_mu0, p
   )
   colnames(priors.sample) <- c("x_plot", "x_plot_norm", "iteration")
 
-
+  # draw a 1000 samples from the normal distributions for all thetas based on the mean and standard deviation values each of them have
   priors.zero.random0 <- rnorm(iterations, priors.zero$mu0, priors.zero$sd0) # theta 3 distribution
   priors.zero.random1 <- rnorm(iterations, priors.zero$mu1, priors.zero$sd1) # theta 4 distribution
   priors.one.random0 <- rnorm(iterations, priors.one$mu0, priors.one$sd0) # theta 5 distribution
@@ -158,21 +158,21 @@ updating <- function (name, priors_beta_mu1, priors_beta_sd1, priors_beta_mu0, p
 
       # do not know
       for (i in 1:n.zero) {
-        y.zero[i] ~ dbern(0)
+        y.zero[i] ~ dbern(0) # the probability of success p here is estimated in BUGS, based on the value of y.zero
       }
       for (i in 1:n.one) {
-        y.one[i] ~ dbern(1)
+        y.one[i] ~ dbern(1) # the probability of success here is estimated based on the value of y.one
       }
 
       # likelihood for mu and phi (precision) - probit link function
       for (i in 1:n.cont) {
-        y.c[i] ~ dbeta(p[i], q[i]) # y.c = cont values - eq 3
-        p[i] <- mu2[i] * phi
-        q[i] <- (1 - mu2[i]) * phi
+        y.c[i] ~ dbeta(p[i], q[i]) # y.c = cont values - eq 3 -> Here we estimate the parameters p, q based on y.c
+        p[i] <- mu2[i] * phi # based on the value of p estimated, mu2, phi are estimated here
+        q[i] <- (1 - mu2[i]) * phi # same with the above thing
         probit(mu2[i]) <- (1 / b0) * log(x.c[i] / b1) # eq 5
       }
     }
-    ", file= "beinf_for_reference.txt"
+    ", file= "beinf.txt"
   )
 
   jd <- list(
@@ -200,7 +200,7 @@ updating <- function (name, priors_beta_mu1, priors_beta_sd1, priors_beta_mu0, p
     x.c=x.c,
     n=n
   )
-  model <- jags.model("beinf_for_reference.txt", data=jd, n.chains=3, n.adapt=1000) # create the model such that it runs a 1000 times before proceeding, a.k.a burn in
+  model <- jags.model("beinf.txt", data=jd, n.chains=3, n.adapt=1000) # create the model such that it runs a 1000 times before proceeding, a.k.a burn in
   # n.chains = parallel mcmc chains argument
 
   update(model, 1000)
@@ -254,7 +254,7 @@ updating <- function (name, priors_beta_mu1, priors_beta_sd1, priors_beta_mu0, p
   colnames(posteriors.sample) <- c("x_plot", "iteration", "zero", "one", "beta")
   write.csv(posteriors.sample, paste0(getwd(), '/data/vulnerability/posteriors_', name, '.csv'))
 
-  file.remove('beinf_for_reference.txt')
+  file.remove('beinf.txt')
 }
 
 updating('bad', 220, 25, 0.15, 0.03)
